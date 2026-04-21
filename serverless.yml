@@ -1,0 +1,52 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: corebik
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: first-app
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: auction-service
+frameworkVersion: "4"
+useDotenv: true
+
+plugins:
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: ${env:AWS_NODEJS_RUNTIME, 'nodejs22.x'}
+  stage: ${opt:stage, 'dev'}
+  region: ${env:AWS_DEFAULT_REGION, 'us-east-1'}
+  # Uncomment to easily set up a custom domain. Read the docs for more details:
+  # https://www.serverless.com/framework/docs/providers/aws/guide/domains
+  # domain: api.example.com
+  environment:
+    AUCTIONS_TABLE_NAME: ${self:custom.AuctionsTableName.name}
+  iamRoleStatements:
+    - ${file(iam/AuctionsTableIAM.yml):AuctionsTableIAM}
+
+resources:
+  Resources:
+    AuctionsTable: ${file(resources/AuctionsTable.yml):AuctionsTable}
+
+custom:
+  AuctionsTableName: 
+    name: !Ref AuctionsTable
+    arn: !GetAtt AuctionsTable.Arn
+  serverless-offline:
+    httpPort: 5000
+
+build:
+  esbuild:
+    bundle: true
+    minify: false
+    format: esm
+    target: ${env:ESBUILD_TARGET, 'node22'}
+    banner:
+      js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
+
+functions:
+  createAuction:
+    handler: src/handlers/createAuction.handler
+    events:
+      - http:
+          method: POST
+          path: /auction
