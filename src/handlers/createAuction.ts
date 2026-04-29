@@ -5,13 +5,11 @@ import {
 import { v4 as uuid } from "uuid";
 import AWS from "aws-sdk";
 
-import middy from "@middy/core";
 import httpJsonBodyParser from "@middy/http-json-body-parser";
-import httpEventNormalizer from "@middy/http-event-normalizer";
-import httpErrorHandler from "@middy/http-error-handler";
 import createError from "http-errors";
 
 import { AuctionDto, CreateAuctionDto } from "../DTOs/auction.dto.js";
+import { commonMiddleware } from "../lib/commonMiddleware.js";
 
 type CreateAuctionEvent = Omit<APIGatewayProxyEvent, "body"> & {
   body: CreateAuctionDto;
@@ -29,6 +27,7 @@ const createAuction = async (
     title,
     status: "OPEN",
     createdAt: new Date().toISOString(),
+    highestBid: { amount: 0 },
   };
   
   try {    
@@ -50,7 +49,5 @@ const createAuction = async (
   };
 };
 
-export const handler = middy(createAuction)
-  .use(httpJsonBodyParser())
-  .use(httpEventNormalizer())
-  .use(httpErrorHandler());
+export const handler = commonMiddleware(createAuction)
+  .use(httpJsonBodyParser());
