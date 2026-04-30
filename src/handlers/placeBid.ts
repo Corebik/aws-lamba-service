@@ -1,29 +1,37 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import AWS from "aws-sdk";
 
 import createError from "http-errors";
 import { commonMiddleware } from "../lib/commonMiddleware.js";
 import httpJsonBodyParser from '@middy/http-json-body-parser';
 import { getAuctionById } from "./getAuction.js";
 
+import { UpdateCommand, type UpdateCommandInput } from "@aws-sdk/lib-dynamodb";
+import { dynamoDb } from "../lib/dynamoDbClient.js";
+
+import validator from "@middy/validator";
+import { transpileSchema } from "@middy/validator/transpile";
+import PlaceBidSchema from "../schemas/placeBid.schema.js";
+
 type CreateAuctionEvent = Omit<APIGatewayProxyEvent, "body"> & {
   body: { amount: number; };
 };
 
-const dynamoDb = new AWS.DynamoDB.DocumentClient();
-
 const placeBid = async (event: CreateAuctionEvent): Promise<APIGatewayProxyResult> => {
-  if(!event.pathParameters) throw new createError.BadRequest("Missing id path parameter");
+  if(!event.pathParameters || !event.pathParameters.id) 
+    throw new createError.BadRequest("Missing id path parameter");
 
   const { id } = event.pathParameters;
   const { amount } = event.body;
 
   const auction = await getAuctionById(id);
 
+  if(auction.status !== "OPEN")
+    throw new createError.BadRequest("You can not place a bid on a closed auction!");
+
   if(amount <= auction.highestBid.amount) 
     throw new createError.BadRequest(`Bid amount must be higher than the current highest bid of ${auction.highestBid.amount}`);
 
-  const params = {
+  const params: UpdateCommandInput = {
     TableName: process.env.AUCTIONS_TABLE_NAME!,
     Key: { id },
     UpdateExpression: "set highestBid.amount = :amount",
@@ -39,7 +47,7 @@ const placeBid = async (event: CreateAuctionEvent): Promise<APIGatewayProxyResul
   };
 
   try {
-    const result = await dynamoDb.update(params).promise();
+    const result = await dynamoDb.send(new UpdateCommand(params));
     const updatedAuction = result.Attributes;
 
     return {
@@ -53,4 +61,5 @@ const placeBid = async (event: CreateAuctionEvent): Promise<APIGatewayProxyResul
 };
 
 export const handler = commonMiddleware(placeBid)
-.use(httpJsonBodyParser());
+.use(httpJsonBodyParser())
+.use(validator({ eventSchema: transpileSchema(PlaceBidSchema) }));

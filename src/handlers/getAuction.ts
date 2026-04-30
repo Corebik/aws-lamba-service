@@ -1,19 +1,21 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import AWS from "aws-sdk";
 
 import createError from "http-errors";
 import { commonMiddleware } from "../lib/commonMiddleware.js";
 
-const dynamoDb = new AWS.DynamoDB.DocumentClient();
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { dynamoDb } from "../lib/dynamoDbClient.js";
 
 export const getAuctionById = async (id?: string) => {
   if (!id) throw new createError.BadRequest("Missing id path parameter");
 
   try {
-    const result = await dynamoDb.get({
-      TableName: process.env.AUCTIONS_TABLE_NAME!,
-      Key: { id },
-    }).promise();
+    const result = await dynamoDb.send(
+      new GetCommand({
+        TableName: process.env.AUCTIONS_TABLE_NAME!,
+        Key: { id },
+      }),
+    );
 
     const auction = result.Item;
 
