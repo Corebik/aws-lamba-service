@@ -28,6 +28,7 @@ resources:
     AuctionsTable: ${file(resources/AuctionsTable.yml):AuctionsTable}
 
 custom:
+  authorizer: arn:aws:lambda:${aws:region}:${aws:accountId}:function:serverless-auth0-authorizer-${self:provider.stage}-auth
   AuctionsTableName: 
     name: !Ref AuctionsTable
     arn: !GetAtt AuctionsTable.Arn
@@ -50,24 +51,38 @@ functions:
       - http:
           method: POST
           path: /auction
+          authorizer:
+            arn: ${self:custom.authorizer}
+            resultTtlInSeconds: 0
   getAuctions:
     handler: src/handlers/getAuctions.handler
     events:
       - http:
           method: GET
           path: /auctions
+          authorizer:
+            arn: ${self:custom.authorizer}
+            resultTtlInSeconds: 0
   getAuction:
     handler: src/handlers/getAuction.handler
     events:
       - http:
           method: GET
           path: /auction/{id}
+          authorizer:
+            arn: ${self:custom.authorizer}
+            resultTtlInSeconds: 0
   placeBid:
     handler: src/handlers/placeBid.handler
     events:
       - http:
           method: PATCH
           path: /auction/{id}/bid
+          authorizer:
+            arn: ${self:custom.authorizer}
+            type: TOKEN
+            identitySource: method.request.header.Authorization
+            resultTtlInSeconds: 0
   processAuctions:
     handler: src/handlers/processAuctions.handler
     # events:

@@ -10,5 +10,7 @@ createdAt: string;
 endingAt: string;
 highestBid: {
   amount: number;
+  bidder?: string;
 };
+seller: string;
 }

@@ -1,6 +1,7 @@
 import {
   APIGatewayProxyEvent,
   APIGatewayProxyResult,
+  // Context,
 } from "aws-lambda";
 import { v4 as uuid } from "uuid";
 
@@ -16,15 +17,21 @@ import { dynamoDb } from "../lib/dynamoDbClient.js";
 import validator from "@middy/validator";
 import { transpileSchema } from "@middy/validator/transpile";
 import createAuctionSchema from "../schemas/createAuction.schema.js";
+import { Auth0AuthorizerContext } from "../types/requestContext.type.js";
 
 type CreateAuctionEvent = Omit<APIGatewayProxyEvent, "body"> & {
   body: CreateAuctionDto;
+  requestContext: APIGatewayProxyEvent["requestContext"] & {
+    authorizer: Auth0AuthorizerContext;
+  };
 };
 
 const createAuction = async (
   event: CreateAuctionEvent,
+  // context: Context
 ): Promise<APIGatewayProxyResult> => {
   const { title } = event.body;
+  const { email } = event.requestContext.authorizer;
   const now = new Date();
   const endDate = new Date();
   endDate.setHours(now.getHours() + 1);
@@ -36,6 +43,7 @@ const createAuction = async (
     createdAt: now.toISOString(),
     endingAt: endDate.toISOString(),
     highestBid: { amount: 0 },
+    seller: email,
   };
   
   try {    
