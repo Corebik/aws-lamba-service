@@ -20,20 +20,31 @@ provider:
   # domain: api.example.com
   environment:
     AUCTIONS_TABLE_NAME: ${self:custom.AuctionsTableName.name}
+    MAIL_QUEUE_URL: ${self:custom.MailQueue.url}
+    AUCTIONS_BUCKET_NAME: ${self:custom.AuctionsBucket.name}
   iamRoleStatements:
     - ${file(iam/AuctionsTableIAM.yml):AuctionsTableIAM}
+    - ${file(iam/MailQueueIAM.yml):MailQueueIAM}
+    - ${file(iam/AuctionsBucketIAM.yml):AuctionsBucketIAM}
 
 resources:
   Resources:
     AuctionsTable: ${file(resources/AuctionsTable.yml):AuctionsTable}
+    AuctionsBucket: ${file(resources/AuctionsBucket.yml):AuctionsBucket}
+    AuctionsBucketPolicy: ${file(resources/AuctionsBucket.yml):AuctionsBucketPolicy}
 
 custom:
-  authorizer: arn:aws:lambda:${aws:region}:${aws:accountId}:function:serverless-auth0-authorizer-${self:provider.stage}-auth
+  serverless-offline:
+    httpPort: 5000
   AuctionsTableName: 
     name: !Ref AuctionsTable
     arn: !GetAtt AuctionsTable.Arn
-  serverless-offline:
-    httpPort: 5000
+  authorizer: arn:aws:lambda:${aws:region}:${aws:accountId}:function:serverless-auth0-authorizer-${self:provider.stage}-auth
+  MailQueue:
+    arn: ${cf:notification-service-${self:provider.stage}.MailQueueArn}
+    url: ${cf:notification-service-${self:provider.stage}.MailQueueUrl}
+  AuctionsBucket:
+    name: corebik-auction-bucket-${self:provider.stage}
 
 build:
   esbuild:
@@ -78,6 +89,17 @@ functions:
       - http:
           method: PATCH
           path: /auction/{id}/bid
+          authorizer:
+            arn: ${self:custom.authorizer}
+            type: TOKEN
+            identitySource: method.request.header.Authorization
+            resultTtlInSeconds: 0
+  uploadAuctionImage:
+    handler: src/handlers/uploadAuctionImage.handler
+    events:
+      - http:
+          method: PATCH
+          path: /auction/{id}/image
           authorizer:
             arn: ${self:custom.authorizer}
             type: TOKEN
